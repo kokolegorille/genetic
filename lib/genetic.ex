@@ -4,6 +4,7 @@ defmodule Genetic do
   """
 
   alias Types.Chromosome
+  alias Toolbox.Selection
 
   # def run(fitness_function, genotype, max_fitness, opts \\ []) do
   #   population = initialize(genotype)
@@ -13,8 +14,9 @@ defmodule Genetic do
 
   def run(problem, opts \\ []) do
     population = initialize(&problem.genotype/0)
+    first_generation = 0
     population
-    |> evolve(problem, opts)
+    |> evolve(problem, first_generation, opts)
   end
 
   # def evolve(population, fitness_function, genotype, max_fitness, opts \\ []) do
@@ -32,18 +34,34 @@ defmodule Genetic do
   #   end
   # end
 
-  def evolve(population, problem, opts \\ []) do
+  # def evolve(population, problem, generation, opts \\ []) do
+  #   population = evaluate(population, &problem.fitness_function/1, opts)
+  #   best = hd(population)
+  #   IO.write("\rCurrent Best: #{best.fitness}")
+  #   if problem.terminate?(population, generation) do
+  #     best
+  #   else
+  #     generation = generation + 1
+  #     population
+  #     |> select(opts)
+  #     |> crossover(opts)
+  #     |> mutation(opts)
+  #     |> evolve(problem, generation, opts)
+  #   end
+  # end
+
+  def evolve(population, problem, generation, opts \\ []) do
     population = evaluate(population, &problem.fitness_function/1, opts)
     best = hd(population)
     IO.write("\rCurrent Best: #{best.fitness}")
-    if problem.terminate?(population) do
+    if problem.terminate?(population, generation) do
       best
     else
-      population
-      |> select(opts)
-      |> crossover(opts)
+      {parents, left_over} = select(population, opts)
+      children = crossover(parents, opts)
+      children ++ left_over
       |> mutation(opts)
-      |> evolve(problem, opts)
+      |> evolve(problem, generation + 1, opts)
     end
   end
 
@@ -67,10 +85,28 @@ defmodule Genetic do
     |> Enum.sort_by(& &1.fitness, &>=/2)
   end
 
-  def select(population, _opts \\ []) do
-    population
-    |> Enum.chunk_every(2)
-    |> Enum.map(&List.to_tuple(&1))
+  # def select(population, _opts \\ []) do
+  #   population
+  #   |> Enum.chunk_every(2)
+  #   |> Enum.map(&List.to_tuple(&1))
+  # end
+
+  def select(population, opts \\ []) do
+    select_fn = Keyword.get(opts, :selection_type, &Selection.elite/2)
+    select_rate = Keyword.get(opts, :selection_rate, 0.8)
+    n = round(length(population) * select_rate)
+    n = if rem(n, 2) == 0, do: n, else: n + 1
+    parents =
+      apply(select_fn, [population, n])
+    left_over =
+      population
+      |> MapSet.new()
+      |> MapSet.difference(MapSet.new(parents))
+    parents =
+      parents
+      |>  Enum.chunk_every(2)
+      |> Enum.map(&List.to_tuple(&1))
+    {parents, MapSet.to_list(left_over)}
   end
 
   # def crossover(population, _opts \\ []) do
