@@ -4,7 +4,11 @@ defmodule Genetic do
   """
 
   alias Types.Chromosome
-  alias Toolbox.Selection
+  alias Toolbox.{
+    Selection,
+    Crossover,
+    Mutation
+  }
 
   # def run(fitness_function, genotype, max_fitness, opts \\ []) do
   #   population = initialize(genotype)
@@ -122,18 +126,28 @@ defmodule Genetic do
   #   end)
   # end
 
-  def crossover(population, _opts \\ []) do
+  # def crossover(population, _opts \\ []) do
+  #   population
+  #   |> Enum.reduce([], fn {p1, p2}, acc ->
+  #     cx_point = :rand.uniform(length(p1.genes))
+  #     {{h1, t1}, {h2, t2}} = {
+  #       Enum.split(p1.genes, cx_point),
+  #       Enum.split(p2.genes, cx_point)
+  #     }
+  #     {c1, c2} = {
+  #       %Chromosome{p1 | genes: h1 ++ t2},
+  #       %Chromosome{p2 | genes: h2 ++ t1}
+  #     }
+  #     [c1, c2 | acc]
+  #   end)
+  # end
+
+  def crossover(population, opts \\ []) do
+    crossover_fn = Keyword.get(opts, :crossover_type, &Crossover.order_one_crossover/2)
+
     population
     |> Enum.reduce([], fn {p1, p2}, acc ->
-      cx_point = :rand.uniform(length(p1.genes))
-      {{h1, t1}, {h2, t2}} = {
-        Enum.split(p1.genes, cx_point),
-        Enum.split(p2.genes, cx_point)
-      }
-      {c1, c2} = {
-        %Chromosome{p1 | genes: h1 ++ t2},
-        %Chromosome{p2 | genes: h2 ++ t1}
-      }
+      {c1, c2} = apply(crossover_fn, [p1, p2])
       [c1, c2 | acc]
     end)
   end
@@ -149,11 +163,24 @@ defmodule Genetic do
   #   end)
   # end
 
-  def mutation(population, _opts \\ []) do
+  # def mutation(population, _opts \\ []) do
+  #   population
+  #   |> Enum.map(fn chromosome ->
+  #     if :rand.uniform() < 0.05 do
+  #       %Chromosome{chromosome | genes: Enum.shuffle(chromosome.genes)}
+  #     else
+  #       chromosome
+  #     end
+  #   end)
+  # end
+
+  def mutation(population, opts \\ []) do
+    mutate_fn = Keyword.get(opts, :mutation_type, &Mutation.scramble/1)
+
     population
     |> Enum.map(fn chromosome ->
       if :rand.uniform() < 0.05 do
-        %Chromosome{chromosome | genes: Enum.shuffle(chromosome.genes)}
+        apply(mutate_fn, [chromosome])
       else
         chromosome
       end
